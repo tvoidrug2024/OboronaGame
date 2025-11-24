@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"="width=device-width, initial-scale=1.0">
+    <title>Оборона Краматорска</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial Black', Arial, sans-serif;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+        }
+        
+        body.playing {
+            cursor: none;
+        }
+        
+        #missileIndicators {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 98;
+            display: none;
+        }
+        
+        .missile-indicator {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .indicator-arrow {
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 35px solid rgba(255, 50, 0, 0.9);
+            filter: drop-shadow(0 0 15px #ff0000);
+            animation: indicatorPulse 0.8s infinite;
+        }
+        
+        .indicator-distance {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000, 0 0 5px #000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 10px;
+            border-radius: 5px;
+            border: 2px solid #ff0000;
+        }
+        
+        @keyframes indicatorPulse {
+            0%, 100% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.15); }
+        }
+        
+        #mainMenu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        #mainMenu h1 {
+            font-size: 4em;
+            color: #ffd700;
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff4500, 0 5px 10px rgba(0,0,0,0.8);
+            margin-bottom: 20px;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { text-shadow: 0 0 20px #ff0000, 0 0 40px #ff4500, 0 5px 10px rgba(0,0,0,0.8); }
+            50% { text-shadow: 0 0 30px #ff0000, 0 0 60px #ff4500, 0 5px 15px rgba(0,0,0,0.9); }
+        }
+        
+        .subtitle {
+            font-size: 1.2em;
+            color: #add8e6;
+            margin-bottom: 50px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        
+        button {
+            font-family: 'Arial Black', Arial, sans-serif;
+            font-size: 1.5em;
+            padding: 20px 60px;
+            background: linear-gradient(45deg, #ff4500, #ff6347);
+            border: 3px solid #ffd700;
+            color: #fff;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            box-shadow: 0 5px 15px rgba(255, 69, 0, 0.5);
+            transition: all 0.3s;
+            border-radius: 10px;
+        }
+        
+        button:hover {
+            background: linear-gradient(45deg, #ff6347, #ff4500);
+            box-shadow: 0 8px 25px rgba(255, 69, 0, 0.8);
+            transform: translateY(-3px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        #tutorial {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px 60px;
+            border: 3px solid #ffd700;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 1001;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+        }
+        
+        #tutorial h2 {
+            font-size: 2em;
+            color: #ffd700;
+            margin-bottom: 20px;
+        }
+        
+        #tutorial p {
+            font-size: 1.3em;
+            line-height: 1.8;
+            color: #fff;
+        }
+        
+        #hud {
+            display: none;
+            pointer-events: none;
+        }
+        
+        #score, #health, #wave {
+            position: fixed;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 10px;
+            border: 2px solid #ffd700;
+        }
+        
+        #score {
+            top: 20px;
+            left: 20px;
+            color: #00ff00;
+        }
+        
+        #health {
+            top: 20px;
+            right: 20px;
+            color: #ff0000;
+        }
+        
+        #wave {
+            top: 80px;
+            left: 20px;
+            color: #add8e6;
+        }
+        
+        #gameOver {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        #gameOver h2 {
+            font-size: 5em;
+            color: #ff0000;
+            text-shadow: 0 0 30px #ff0000, 0 5px 10px rgba(0,0,0,0.8);
+            margin-bottom: 30px;
+            animation: shake 0.5s infinite;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        
+        #finalScore {
+            font-size: 2em;
+            color: #ffd700;
+            margin-bottom: 40px;
+        }
+        
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            pointer-events: none;
+            z-index: 99;
+            transition: all 0.3s;
+        }
+        
+        .crosshair.zoomed {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 0, 0, 0.8);
+            box-shadow: 0 0 10px #ff0000;
+        }
+        
+        .crosshair::before {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+        
+        .crosshair::after {
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body>
+    <div id="mainMenu">
+        <h1>ОБОРОНА КРАМАТОРСКА</h1>
+        <div class="subtitle">Защити город от ракетных атак</div>
+        <button id="playButton">ИГРАТЬ</button>
+    </div>
+    
+    <div id="tutorial">
+        <h2>УПРАВЛЕНИЕ</h2>
+        <p>МЫШЬ - НАВЕДЕНИЕ<br>ЛКМ - СТРЕЛЬБА<br>ПКМ - ПРИЦЕЛИВАНИЕ</p>
+    </div>
+    
+    <div id="hud">
+        <div id="score">СЧЕТ: 0</div>
+        <div id="health">❤️❤️❤️</div>
+        <div id="wave">ВОЛНА: 1</div>
+    </div>
+    
+    <div class="crosshair"></div>
+    <div id="missileIndicators"></div>
+    
+    <div id="gameOver">
+        <h2>ВЫ ПОГИБЛИ</h2>
+        <div id="finalScore">ФИНАЛЬНЫЙ СЧЕТ: 0</div>
+        <button id="restartButton">ЗАНОВО</button>
+    </div>
+
+    <script>
+        // ========== GAME STATE ==========
+        const gameState = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            missiles: [],
+            particles: [],
+            buildings: [],
+            playerBuilding: null,
+            score: 0,
+            health: 3,
+            wave: 1,
+            gameStarted: false,
+            gameOver: false,
+            time: 0,
+            difficultyTimer: 0,
+            missilesPerWave: 1,
+            spawnTimer: 0,
+            gun: null,
+            raycaster: new THREE.Raycaster(),
+            isZooming: false
+        };
+
+        // ========== SOUND MANAGER ==========
+        class SoundManager {
+            constructor() {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            playSiren() {
+                const duration = 3;
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(400, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(800, this.audioContext.currentTime + 1);
+                oscillator.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 2);
+                oscillator.frequency.exponentialRampToValueAtTime(800, this.audioContext.currentTime + 3);
+                
+                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + duration);
+            }
+
+            playShoot() {
+                const duration = 0.15;
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                const noiseBuffer = this.createNoiseBuffer(0.1);
+                const noise = this.audioContext.createBufferSource();
+                
+                noise.buffer = noiseBuffer;
+                
+                oscillator.connect(gainNode);
+                noise.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(120, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(40, this.audioContext.currentTime + duration);
+                
+                gainNode.gain.setValueAtTime(0.25, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime);
+                noise.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + duration);
+                noise.stop(this.audioContext.currentTime + duration);
+            }
+
+            playExplosion() {
+                const duration = 1.2;
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                const noiseBuffer = this.createNoiseBuffer(duration);
+                const noise = this.audioContext.createBufferSource();
+                
+                noise.buffer = noiseBuffer;
+                
+                oscillator.connect(gainNode);
+                noise.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(220, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(30, this.audioContext.currentTime + duration);
+                
+                gainNode.gain.setValueAtTime(0.5, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime);
+                noise.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + duration);
+                noise.stop(this.audioContext.currentTime + duration);
+            }
+
+            playHit() {
+                const duration = 0.6;
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(900, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(80, this.audioContext.currentTime + duration);
+                
+                gainNode.gain.setValueAtTime(0.35, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + duration);
+            }
+
+            playPlayerHit() {
+                const duration = 2.5;
+                
+                const bass = this.audioContext.createOscillator();
+                const bassGain = this.audioContext.createGain();
+                bass.connect(bassGain);
+                bassGain.connect(this.audioContext.destination);
+                bass.type = 'sine';
+                bass.frequency.setValueAtTime(50, this.audioContext.currentTime);
+                bass.frequency.exponentialRampToValueAtTime(15, this.audioContext.currentTime + duration);
+                bassGain.gain.setValueAtTime(0.7, this.audioContext.currentTime);
+                bassGain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                const siren = this.audioContext.createOscillator();
+                const sirenGain = this.audioContext.createGain();
+                siren.connect(sirenGain);
+                sirenGain.connect(this.audioContext.destination);
+                siren.type = 'square';
+                siren.frequency.setValueAtTime(550, this.audioContext.currentTime);
+                siren.frequency.linearRampToValueAtTime(850, this.audioContext.currentTime + 0.35);
+                siren.frequency.linearRampToValueAtTime(550, this.audioContext.currentTime + 0.7);
+                siren.frequency.linearRampToValueAtTime(850, this.audioContext.currentTime + 1.05);
+                siren.frequency.linearRampToValueAtTime(550, this.audioContext.currentTime + 1.4);
+                sirenGain.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+                sirenGain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                const noiseBuffer = this.createNoiseBuffer(duration);
+                const noise = this.audioContext.createBufferSource();
+                const noiseGain = this.audioContext.createGain();
+                noise.buffer = noiseBuffer;
+                noise.connect(noiseGain);
+                noiseGain.connect(this.audioContext.destination);
+                noiseGain.gain.setValueAtTime(0.35, this.audioContext.currentTime);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+                
+                bass.start(this.audioContext.currentTime);
+                siren.start(this.audioContext.currentTime);
+                noise.start(this.audioContext.currentTime);
+                
+                bass.stop(this.audioContext.currentTime + duration);
+                siren.stop(this.audioContext.currentTime + duration);
+                noise.stop(this.audioContext.currentTime + duration);
+            }
+
+            createNoiseBuffer(duration) {
+                const bufferSize = this.audioContext.sampleRate * duration;
+                const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+                const output = buffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+                
+                return buffer;
+            }
+        }
+
+        const soundManager = new SoundManager();
+
+        // ========== PROCEDURAL TEXTURES ==========
+        function createBuildingTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#3a3a3a';
+            ctx.fillRect(0, 0, 512, 512);
+            
+            for (let y = 0; y < 512; y += 64) {
+                for (let x = 0; x < 512; x += 64) {
+                    if (Math.random() > 0.3) {
+                        ctx.fillStyle = Math.random() > 0.5 ? '#ffff88' : '#ffffff';
+                        ctx.fillRect(x + 8, y + 8, 48, 48);
+                    } else {
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.fillRect(x + 8, y + 8, 48, 48);
+                    }
+                }
+            }
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createGroundTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(0, 0, 512, 512);
+            
+            for (let i = 0; i < 200; i++) {
+                ctx.fillStyle = `rgb(${Math.random() * 50}, ${Math.random() * 50}, ${Math.random() * 50})`;
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, Math.random() * 20, Math.random() * 20);
+            }
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // ========== PARTICLE SYSTEM ==========
+        class Particle {
+            constructor(position, velocity, life, color, size) {
+                this.position = position.clone();
+                this.velocity = velocity.clone();
+                this.life = life;
+                this.maxLife = life;
+                this.color = color;
+                this.size = size;
+                this.mesh = null;
+            }
+
+            update(deltaTime) {
+                this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+                this.velocity.y -= 9.8 * deltaTime;
+                this.life -= deltaTime;
+                
+                if (this.mesh) {
+                    this.mesh.position.copy(this.position);
+                    const opacity = this.life / this.maxLife;
+                    this.mesh.material.opacity = opacity;
+                    this.mesh.scale.setScalar(this.size * opacity);
+                }
+                
+                return this.life > 0;
+            }
+        }
+
+        // ========== BUILDING DEBRIS ==========
+        function createBuildingDebris(building) {
+            const debris = [];
+            const chunkSize = 3;
+            const width = building.userData.width;
+            const height = building.userData.height;
+            const depth = building.userData.depth;
+            
+            for (let x = -width/2; x < width/2; x += chunkSize) {
+                for (let y = -height/2; y < height/2; y += chunkSize) {
+                    for (let z = -depth/2; z < depth/2; z += chunkSize) {
+                        const chunkGeo = new THREE.BoxGeometry(chunkSize, chunkSize, chunkSize);
+                        const chunkMat = new THREE.MeshPhongMaterial({
+                            map: createBuildingTexture(),
+                            transparent: true,
+                            opacity: 1
+                        });
+                        const chunk = new THREE.Mesh(chunkGeo, chunkMat);
+                        
+                        chunk.position.set(
+                            building.position.x + x + chunkSize/2,
+                            building.position.y + y + chunkSize/2,
+                            building.position.z + z + chunkSize/2
+                        );
+                        
+                        chunk.userData = {
+                            velocity: new THREE.Vector3(
+                                (Math.random() - 0.5) * 15,
+                                Math.random() * 10 + 5,
+                                (Math.random() - 0.5) * 15
+                            ),
+                            rotation: new THREE.Vector3(
+                                (Math.random() - 0.5) * 0.2,
+                                (Math.random() - 0.5) * 0.2,
+                                (Math.random() - 0.5) * 0.2
+                            ),
+                            life: 3 + Math.random() * 2
+                        };
+                        
+                        gameState.scene.add(chunk);
+                        debris.push(chunk);
+                    }
+                }
+            }
+            
+            return debris;
+        }
+
+        function updateDebris(deltaTime) {
+            if (!gameState.debris) gameState.debris = [];
+            
+            for (let i = gameState.debris.length - 1; i >= 0; i--) {
+                const chunk = gameState.debris[i];
+                chunk.userData.life -= deltaTime;
+                
+                if (chunk.userData.life <= 0) {
+                    gameState.scene.remove(chunk);
+                    chunk.geometry.dispose();
+                    chunk.material.dispose();
+                    gameState.debris.splice(i, 1);
+                    continue;
+                }
+                
+                chunk.position.add(chunk.userData.velocity.clone().multiplyScalar(deltaTime));
+                chunk.userData.velocity.y -= 9.8 * deltaTime;
+                
+                chunk.rotation.x += chunk.userData.rotation.x;
+                chunk.rotation.y += chunk.userData.rotation.y;
+                chunk.rotation.z += chunk.userData.rotation.z;
+                
+                const opacity = chunk.userData.life / 5;
+                chunk.material.opacity = Math.max(0, opacity);
+                
+                if (chunk.position.y < 0) {
+                    chunk.userData.velocity.y *= -0.3;
+                    chunk.position.y = 0;
+                }
+            }
+        }
+
+        function createExplosion(position, count = 50) {
+            for (let i = 0; i < count; i++) {
+                const velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20
+                );
+                
+                const colors = [0xff4500, 0xff6347, 0xffd700, 0xff8c00, 0xff0000];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                const particle = new Particle(position, velocity, 1 + Math.random(), color, 0.5 + Math.random() * 0.5);
+                
+                const geometry = new THREE.SphereGeometry(0.5, 8, 8);
+                const material = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 1
+                });
+                particle.mesh = new THREE.Mesh(geometry, material);
+                particle.mesh.position.copy(position);
+                gameState.scene.add(particle.mesh);
+                
+                gameState.particles.push(particle);
+            }
+        }
+
+        // ========== MISSILE CLASS ==========
+        class Missile {
+            constructor(startPos, targetPos) {
+                this.position = startPos.clone();
+                this.targetPos = targetPos.clone();
+                
+                const direction = new THREE.Vector3().subVectors(targetPos, startPos).normalize();
+                this.velocity = direction.multiplyScalar(12 + Math.random() * 8);
+                
+                const geometry = new THREE.CylinderGeometry(0.3, 0.5, 3, 8);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x2a2a2a,
+                    emissive: 0x660000
+                });
+                
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.copy(this.position);
+                this.mesh.lookAt(targetPos);
+                this.mesh.rotateX(Math.PI / 2);
+                
+                gameState.scene.add(this.mesh);
+                this.trailTimer = 0;
+            }
+
+            update(deltaTime) {
+                this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+                this.mesh.position.copy(this.position);
+                
+                this.trailTimer += deltaTime;
+                if (this.trailTimer > 0.05) {
+                    this.trailTimer = 0;
+                    const trailPos = this.position.clone();
+                    trailPos.add(new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.5,
+                        (Math.random() - 0.5) * 0.5,
+                        (Math.random() - 0.5) * 0.5
+                    ));
+                    
+                    const velocity = new THREE.Vector3(
+                        (Math.random() - 0.5) * 2,
+                        (Math.random() - 0.5) * 2,
+                        (Math.random() - 0.5) * 2
+                    );
+                    
+                    const particle = new Particle(trailPos, velocity, 0.6, 0xff4500, 0.35);
+                    const geometry = new THREE.SphereGeometry(0.35, 6, 6);
+                    const material = new THREE.MeshBasicMaterial({
+                        color: 0xff4500,
+                        transparent: true,
+                        opacity: 1
+                    });
+                    particle.mesh = new THREE.Mesh(geometry, material);
+                    particle.mesh.position.copy(trailPos);
+                    gameState.scene.add(particle.mesh);
+                    gameState.particles.push(particle);
+                }
+                
+                for (let building of gameState.buildings) {
+                    const dx = Math.abs(this.position.x - building.position.x);
+                    const dy = Math.abs(this.position.y - building.position.y);
+                    const dz = Math.abs(this.position.z - building.position.z);
+                    
+                    const hw = building.userData.width / 2;
+                    const hh = building.userData.height / 2;
+                    const hd = building.userData.depth / 2;
+                    
+                    if (dx < hw && dy < hh && dz < hd) {
+                        createExplosion(this.position, 70);
+                        soundManager.playExplosion();
+                        
+                        const debris = createBuildingDebris(building);
+                        if (!gameState.debris) gameState.debris = [];
+                        gameState.debris.push(...debris);
+                        
+                        gameState.scene.remove(building);
+                        const index = gameState.buildings.indexOf(building);
+                        if (index > -1) {
+                            gameState.buildings.splice(index, 1);
+                        }
+                        
+                        this.destroy();
+                        return false;
+                    }
+                }
+                
+                const distanceToTarget = this.position.distanceTo(gameState.camera.position);
+                if (distanceToTarget < 5) {
+                    return false;
+                }
+                
+                if (this.position.y < -10 || distanceToTarget > 500) {
+                    this.destroy();
+                    return false;
+                }
+                
+                return true;
+            }
+
+            destroy() {
+                if (this.mesh) {
+                    gameState.scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh.material.dispose();
+                }
+            }
+        }
+
+        // ========== SCENE SETUP ==========
+        function initThreeJS() {
+            gameState.scene = new THREE.Scene();
+            gameState.scene.background = new THREE.Color(0x0a0a1a);
+            gameState.scene.fog = new THREE.Fog(0x0a0a1a, 50, 300);
+            
+            gameState.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            gameState.camera.position.set(0, 15, 0);
+            
+            gameState.renderer = new THREE.WebGLRenderer({ antialias: true });
+            gameState.renderer.setSize(window.innerWidth, window.innerHeight);
+            gameState.renderer.shadowMap.enabled = true;
+            document.body.appendChild(gameState.renderer.domElement);
+            
+            const ambientLight = new THREE.AmbientLight(0x404080, 0.5);
+            gameState.scene.add(ambientLight);
+            
+            const moonLight = new THREE.DirectionalLight(0x8080ff, 0.5);
+            moonLight.position.set(50, 100, 50);
+            gameState.scene.add(moonLight);
+            
+            const groundGeometry = new THREE.PlaneGeometry(500, 500);
+            const groundMaterial = new THREE.MeshPhongMaterial({
+                map: createGroundTexture(),
+                side: THREE.DoubleSide
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = Math.PI / 2;
+            ground.position.y = 0;
+            gameState.scene.add(ground);
+            
+            const buildingGeometry = new THREE.BoxGeometry(10, 12, 10);
+            const buildingMaterial = new THREE.MeshPhongMaterial({
+                map: createBuildingTexture()
+            });
+            gameState.playerBuilding = new THREE.Mesh(buildingGeometry, buildingMaterial);
+            gameState.playerBuilding.position.set(0, 6, 0);
+            gameState.playerBuilding.userData = { width: 10, height: 12, depth: 10 };
+            gameState.scene.add(gameState.playerBuilding);
+            
+            const roofGeometry = new THREE.BoxGeometry(12, 0.5, 12);
+            const roofMaterial = new THREE.MeshPhongMaterial({ color: 0x666666 });
+            const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+            roof.position.set(0, 12.25, 0);
+            gameState.scene.add(roof);
+            
+            gameState.buildings = [];
+            for (let i = 0; i < 30; i++) {
+                const width = 8 + Math.random() * 15;
+                const height = 10 + Math.random() * 30;
+                const depth = 8 + Math.random() * 15;
+                
+                const bldgGeometry = new THREE.BoxGeometry(width, height, depth);
+                const bldgMaterial = new THREE.MeshPhongMaterial({
+                    map: createBuildingTexture()
+                });
+                const building = new THREE.Mesh(bldgGeometry, bldgMaterial);
+                
+                let x, z;
+                do {
+                    x = (Math.random() - 0.5) * 200;
+                    z = (Math.random() - 0.5) * 200;
+                } while (Math.abs(x) < 20 && Math.abs(z) < 20);
+                
+                building.position.set(x, height / 2, z);
+                building.userData = { width, height, depth };
+                gameState.scene.add(building);
+                gameState.buildings.push(building);
+            }
+            
+            const gunGeometry = new THREE.CylinderGeometry(0.3, 0.3, 4, 8);
+            const gunMaterial = new THREE.MeshPhongMaterial({ color: 0x444444 });
+            gameState.gun = new THREE.Mesh(gunGeometry, gunMaterial);
+            gameState.gun.position.set(0, 14, 0);
+            gameState.scene.add(gameState.gun);
+        }
+
+        // ========== GAME LOGIC ==========
+        function spawnMissile() {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 150 + Math.random() * 100;
+            const height = 50 + Math.random() * 50;
+            
+            const startPos = new THREE.Vector3(
+                Math.cos(angle) * distance,
+                height,
+                Math.sin(angle) * distance
+            );
+            
+            const targetPos = gameState.camera.position.clone();
+            targetPos.add(new THREE.Vector3(
+                (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 5,
+                (Math.random() - 0.5) * 10
+            ));
+            
+            const missile = new Missile(startPos, targetPos);
+            gameState.missiles.push(missile);
+        }
+
+        function shoot() {
+            if (gameState.gameOver) return;
+            
+            soundManager.playShoot();
+            gameState.raycaster.setFromCamera(new THREE.Vector2(0, 0), gameState.camera);
+            
+            for (let i = gameState.missiles.length - 1; i >= 0; i--) {
+                const missile = gameState.missiles[i];
+                const intersects = gameState.raycaster.intersectObject(missile.mesh);
+                
+                if (intersects.length > 0) {
+                    createExplosion(missile.position, 90);
+                    soundManager.playExplosion();
+                    missile.destroy();
+                    gameState.missiles.splice(i, 1);
+                    gameState.score += 10;
+                    updateHUD();
+                    break;
+                }
+            }
+        }
+
+        function takeDamage() {
+            gameState.health--;
+            soundManager.playHit();
+            updateHUD();
+            
+            if (gameState.health <= 0) {
+                endGame();
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('score').textContent = `СЧЕТ: ${gameState.score}`;
+            document.getElementById('health').textContent = '❤️'.repeat(gameState.health);
+            document.getElementById('wave').textContent = `ВОЛНА: ${gameState.wave}`;
+        }
+
+        function endGame() {
+            gameState.gameOver = true;
+            document.body.classList.remove('playing');
+            
+            const originalCameraPos = gameState.camera.position.clone();
+            const originalCameraRot = { yaw: cameraYaw, pitch: cameraPitch };
+            
+            gameState.deathCutscene = {
+                time: 0,
+                duration: 2.5,
+                originalPos: originalCameraPos,
+                originalRot: originalCameraRot
+            };
+            
+            createExplosion(gameState.camera.position, 200);
+            soundManager.playPlayerHit();
+            
+            const debris = createBuildingDebris(gameState.playerBuilding);
+            if (!gameState.debris) gameState.debris = [];
+            gameState.debris.push(...debris);
+            
+            gameState.scene.remove(gameState.playerBuilding);
+            if (gameState.gun) gameState.scene.remove(gameState.gun);
+            
+            setTimeout(() => {
+                document.getElementById('finalScore').textContent = `ФИНАЛЬНЫЙ СЧЕТ: ${gameState.score}`;
+                document.getElementById('gameOver').style.display = 'flex';
+            }, 2500);
+        }
+
+        function updateMissileIndicators() {
+            const indicatorsContainer = document.getElementById('missileIndicators');
+            indicatorsContainer.innerHTML = '';
+            
+            if (gameState.missiles.length === 0) return;
+            
+            let closestMissile = null;
+            let closestDistance = Infinity;
+            
+            gameState.missiles.forEach(missile => {
+                const distance = missile.position.distanceTo(gameState.camera.position);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestMissile = missile;
+                }
+            });
+            
+            if (closestMissile) {
+                const missileDir = new THREE.Vector3();
+                missileDir.subVectors(closestMissile.position, gameState.camera.position).normalize();
+                
+                const missileInCamera = missileDir.clone();
+                const cameraMatrix = new THREE.Matrix4();
+                cameraMatrix.extractRotation(gameState.camera.matrixWorld);
+                const inverseCameraMatrix = new THREE.Matrix4();
+                inverseCameraMatrix.copy(cameraMatrix).invert();
+                missileInCamera.applyMatrix4(inverseCameraMatrix);
+                
+                const angleFromCenter = Math.atan2(missileInCamera.x, -missileInCamera.z);
+                
+                if (Math.abs(angleFromCenter) > 0.4 || missileInCamera.z > 0) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'missile-indicator';
+                    
+                    const arrow = document.createElement('div');
+                    arrow.className = 'indicator-arrow';
+                    
+                    const distanceText = document.createElement('div');
+                    distanceText.className = 'indicator-distance';
+                    distanceText.textContent = Math.round(closestDistance) + 'м';
+                    
+                    indicator.appendChild(arrow);
+                    indicator.appendChild(distanceText);
+                    
+                    const screenAngle = angleFromCenter;
+                    let x, y;
+                    const margin = 70;
+                    
+                    if (Math.abs(screenAngle) < Math.PI / 4) {
+                        x = window.innerWidth / 2 + Math.tan(screenAngle) * (window.innerHeight / 2 - margin);
+                        y = margin;
+                        arrow.style.transform = 'rotate(180deg)';
+                    } else if (Math.abs(screenAngle) > 3 * Math.PI / 4) {
+                        x = window.innerWidth / 2 - Math.tan(screenAngle) * (window.innerHeight / 2 - margin);
+                        y = window.innerHeight - margin - 60;
+                        arrow.style.transform = 'rotate(0deg)';
+                    } else if (screenAngle > 0) {
+                        x = window.innerWidth - margin - 20;
+                        y = window.innerHeight / 2 - Math.tan(Math.PI / 2 - screenAngle) * (window.innerWidth / 2 - margin);
+                        arrow.style.transform = 'rotate(-90deg)';
+                    } else {
+                        x = margin;
+                        y = window.innerHeight / 2 + Math.tan(Math.PI / 2 + screenAngle) * (window.innerWidth / 2 - margin);
+                        arrow.style.transform = 'rotate(90deg)';
+                    }
+                    
+                    indicator.style.left = x + 'px';
+                    indicator.style.top = y + 'px';
+                    
+                    indicatorsContainer.appendChild(indicator);
+                }
+            }
+        }
+
+        function startGame() {
+            gameState.gameStarted = true;
+            gameState.gameOver = false;
+            gameState.score = 0;
+            gameState.health = 3;
+            gameState.wave = 1;
+            gameState.time = 0;
+            gameState.difficultyTimer = 0;
+            gameState.missilesPerWave = 1;
+            gameState.missiles = [];
+            gameState.particles = [];
+            
+            gameState.missiles.forEach(m => m.destroy());
+            gameState.missiles = [];
+            
+            gameState.particles.forEach(p => {
+                if (p.mesh) {
+                    gameState.scene.remove(p.mesh);
+                    p.mesh.geometry.dispose();
+                    p.mesh.material.dispose();
+                }
+            });
+            gameState.particles = [];
+            
+            document.getElementById('mainMenu').style.display = 'none';
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('tutorial').style.display = 'block';
+            document.getElementById('hud').style.display = 'block';
+            document.getElementById('missileIndicators').style.display = 'block';
+            document.body.classList.add('playing');
+            updateHUD();
+            
+            soundManager.playSiren();
+            
+            setTimeout(() => {
+                document.getElementById('tutorial').style.display = 'none';
+            }, 3500);
+        }
+
+        // ========== GAME LOOP ==========
+        let lastTime = performance.now();
+        
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+            
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            if (gameState.gameStarted && !gameState.gameOver) {
+                gameState.time += deltaTime;
+                gameState.difficultyTimer += deltaTime;
+                gameState.spawnTimer += deltaTime;
+                
+                if (gameState.difficultyTimer >= 15) {
+                    gameState.difficultyTimer = 0;
+                    gameState.missilesPerWave++;
+                    gameState.wave++;
+                    updateHUD();
+                }
+                
+                if (gameState.spawnTimer >= 7) {
+                    gameState.spawnTimer = 0;
+                    for (let i = 0; i < gameState.missilesPerWave; i++) {
+                        spawnMissile();
+                    }
+                }
+                
+                for (let i = gameState.missiles.length - 1; i >= 0; i--) {
+                    const missile = gameState.missiles[i];
+                    if (!missile.update(deltaTime)) {
+                        const distanceToPlayer = missile.position.distanceTo(gameState.camera.position);
+                        if (distanceToPlayer < 5) {
+                            takeDamage();
+                            createExplosion(missile.position, 120);
+                            soundManager.playPlayerHit();
+                        }
+                        missile.destroy();
+                        gameState.missiles.splice(i, 1);
+                    }
+                }
+                
+                updateMissileIndicators();
+            }
+            
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const particle = gameState.particles[i];
+                if (!particle.update(deltaTime)) {
+                    if (particle.mesh) {
+                        gameState.scene.remove(particle.mesh);
+                        particle.mesh.geometry.dispose();
+                        particle.mesh.material.dispose();
+                    }
+                    gameState.particles.splice(i, 1);
+                }
+            }
+            
+            updateDebris(deltaTime);
+            
+            if (gameState.gun && gameState.camera) {
+                const forward = new THREE.Vector3(0, 0, -1);
+                forward.applyQuaternion(gameState.camera.quaternion);
+                forward.y = Math.max(forward.y, -0.3);
+                const targetPos = gameState.camera.position.clone().add(forward.multiplyScalar(10));
+                gameState.gun.lookAt(targetPos);
+                gameState.gun.rotateX(Math.PI / 2);
+            }
+            
+            gameState.renderer.render(gameState.scene, gameState.camera);
+        }
+
+        // ========== EVENT LISTENERS ==========
+        document.getElementById('playButton').addEventListener('click', () => {
+            startGame();
+        });
+
+        document.getElementById('restartButton').addEventListener('click', () => {
+            startGame();
+        });
+
+        document.addEventListener('click', () => {
+            if (gameState.gameStarted && !gameState.gameOver) {
+                document.body.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === document.body) {
+                document.body.classList.add('playing');
+            } else if (!gameState.gameOver) {
+                document.body.classList.remove('playing');
+            }
+        });
+
+        let cameraYaw = 0;
+        let cameraPitch = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            if (document.pointerLockElement === document.body && gameState.camera) {
+                const sensitivity = gameState.isZooming ? 0.0005 : 0.001;
+                cameraYaw -= event.movementX * sensitivity;
+                cameraPitch -= event.movementY * sensitivity;
+                
+                cameraPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraPitch));
+                
+                gameState.camera.rotation.order = 'YXZ';
+                gameState.camera.rotation.y = cameraYaw;
+                gameState.camera.rotation.x = cameraPitch;
+            }
+        });
+
+        document.addEventListener('mousedown', (event) => {
+            if (gameState.gameStarted && !gameState.gameOver && document.pointerLockElement === document.body) {
+                if (event.button === 0) {
+                    shoot();
+                } else if (event.button === 2) {
+                    gameState.isZooming = true;
+                    gameState.camera.fov = 45;
+                    gameState.camera.updateProjectionMatrix();
+                    document.querySelector('.crosshair').classList.add('zoomed');
+                }
+            }
+        });
+
+        document.addEventListener('mouseup', (event) => {
+            if (event.button === 2) {
+                gameState.isZooming = false;
+                gameState.camera.fov = 75;
+                gameState.camera.updateProjectionMatrix();
+                document.querySelector('.crosshair').classList.remove('zoomed');
+            }
+        });
+
+        document.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+        });
+
+        window.addEventListener('resize', () => {
+            if (gameState.camera && gameState.renderer) {
+                gameState.camera.aspect = window.innerWidth / window.innerHeight;
+                gameState.camera.updateProjectionMatrix();
+                gameState.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+
+        // ========== INITIALIZE ==========
+        initThreeJS();
+        gameLoop();
+    </script>
+</body>
+</html>
